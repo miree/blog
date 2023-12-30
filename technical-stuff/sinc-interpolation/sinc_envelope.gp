@@ -15,7 +15,7 @@ set xlabel "t"
 set ytics 0.5
 plot[-1:15][-0.3:1.1] \
 	envelope(x,10) lw 3 lt 7 title "envelope" ,\
-	sinc(x)                lw 4 lt 6 title "sinc(t)",\
+	sinc(x)-0.1                lw 4 lt 6 title "sinc(t)-0.1",\
 	sinc(x)*envelope(x,10) lw 2 lt 3 lc black title "sinc*envelope"
 
 set ytics 0.2
