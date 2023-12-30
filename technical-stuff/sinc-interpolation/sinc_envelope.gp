@@ -20,6 +20,7 @@ plot[-1:15][-0.3:1.1] \
 set ytics 0.2
 set key bottom right
 plot[0.5:3.5][-0.25:0.25] \
+	"points.dat" using 1:2 w p lt 7 pt 7 ps 2 title "sampling points", \
 	sinc(x)                     lw 4 lt 6            title "sinc(t)",              \
 	"compare.dat" using 1:3 w l lw 3 lc black dt '-' title "optimized approximation"
 
