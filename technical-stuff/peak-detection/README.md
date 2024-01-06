@@ -55,9 +55,20 @@ Consequently, the leading likelihood function is used for peak detection, and th
 `p_trailing(A,t0,yi,ti,dy,w)=exp(-0.5*((yi-A*(1+(t0-ti)/w))/dy)**2)`
 
 This is shown for the points `ti in [2,9]` of the sample data, where `p_leading` was used for the first 4 points, and `p_trailing` was used for the 4 last points.
+The assumption here is, that sample 2 was the first point of an actual peak. 
 
 ![likelihood_and_posterior](likelihood_and_posterior.png)
 
 The final posterior zoomed in around the most likely position:
 
 ![posterior_final](posterior_final.png)
+
+### In the absence of a peak
+
+In case there is no peak in the signal, the exact same analysis results in the following series of posteriors:
+
+![likelihood_and_posterior](likelihood_and_posterior_no_signal.png)
+
+The final posterior in this case indicates `A=0` and `t0` undetermined.
+
+![posterior_final](posterior_final_no_signal.png)
