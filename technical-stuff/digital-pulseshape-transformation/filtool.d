@@ -159,18 +159,12 @@ class WindowIntegral : Filter {
 		idx = 0;
 	}
 	override double apply(double x) {
-		if (buffer[idx] is double.init) {
-			integral += x;
-			buffer[idx] = x;
-			double result = integral / ++idx;
-			if (idx == buffer.length) idx = 0;
-			return result;
-		}
-		integral += buffer[idx];
-		if (++idx == buffer.length) idx = 0;
-		integral -= buffer[idx];
+		integral += x;
+		double result = integral/buffer.length;
 		buffer[idx] = x;
-		return integral/buffer.length;
+		if (++idx == buffer.length) idx = 0;
+		if (buffer[idx] !is double.init) integral -= buffer[idx];
+		return result;
 	}
 }
 
@@ -186,12 +180,8 @@ class DelayedDifference : Filter {
 		idx = 0;
 	}
 	override double apply(double x) {
-		if (buffer[idx] is double.init) {
-			buffer[idx] = x;
-			if (++idx == buffer.length) idx = 0;
-			return 0;
-		}
-		double result = x-buffer[idx];
+		double result = x;
+		if (buffer[idx] !is double.init) result -= buffer[idx];
 		buffer[idx] = x;
 		if (++idx == buffer.length) idx = 0;
 		return result;

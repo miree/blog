@@ -40,6 +40,19 @@ With the assumtion, that the signal is a step function that was filtered by a fi
 
 ```
 
+The program `filtool` takes an arbitrary number of filters (h,l,H,L) with their parameters:
+  - h high pass filter with time constant as parameter
+  - l low pass filter with time constant as parameter 
+  - H inverse high pass with time constant as parameter
+  - L inverse low pass with time constant as parameter
+  - i window integral with window width as parameter
+  - d delayed difference with delay as parameter
+
+The filter specification is followed by a command (gen, fit, apply):
+  - gen generates a step function an applies all specified filters
+  - fit fits a function (step function filtered by specified filters) to data points from stdin by varying the filter parameters. Two additional parameters (time shift and amplitude) are also used and the start parameters for these are specified behind the "fit" keyword.
+  - apply applies all specified filters to the signal on stdin and outputs the result to stdout
+
 ![demo_signal_fit](demo_signal_fit.png)
 
 The fit result a good description of the signal. 
