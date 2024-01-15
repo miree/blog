@@ -18,41 +18,60 @@ With the assumtion, that the signal is a step function that was filtered by a fi
 ```bash 
 ./filtool l5 h5 h5  fit:50,1.0 < demo_signal.dat > demo_signal_fitresult.dat 
            5           5           5          50           1  (  0)
-     9.66418     6.79087     8.82544     49.7906    0.486854  (  1)     chi=91.8257
-     17.2456     15.6316     19.4611     50.2305    0.947885  (  2)     chi=56.7521
-     15.6405     13.4852     17.8218     49.6837    0.966766  (  3)     chi=38.6012
-     12.2523     7.58405     17.6141     50.0655     1.18845  (  4)     chi=25.4992
-     12.6414     8.15464     19.3168     50.3126     1.30002  (  5)     chi=16.2164
-     13.4947     7.93287     17.9151     50.2967     1.40153  (  6)     chi=16.1377
-      14.443     7.77994      17.033     50.3011     1.50399  (  7)     chi=16.1294
-     15.0552     7.75177     16.4222     50.3016     1.56869  (  8)     chi=16.124
-     15.1785     7.76171      16.296     50.3013     1.58139  (  9)     chi=16.123
-     15.2586     7.75701     16.2189     50.3015      1.5899  ( 10)     chi=16.123
-      15.251     7.75831     16.2252     50.3014     1.58905  ( 11)     chi=16.123
-     15.2587     7.75717     16.2191     50.3015      1.5899  ( 12)     chi=16.123
-     15.2618     7.75827      16.214     50.3014     1.59014  ( 13)     chi=16.123
-     15.2615     7.75823      16.214     50.3014     1.59013  ( 14)     chi=16.123
-     15.2615     7.75815     16.2142     50.3014     1.59013  ( 15)     chi=16.123
-
+     9.55795     6.65426     8.74955     49.7959    0.470427  (  1)     chi=89.6374
+     16.8767     16.0206      19.113     50.2495    0.882001  (  2)     chi=51.6394
+     14.6862     13.4389     17.0471     49.5556    0.933384  (  3)     chi=28.239
+     11.8482     10.7412     15.4924     49.9666     1.08932  (  4)     chi=7.88296
+     11.6651     10.3523     16.5656     50.2272     1.11521  (  5)     chi=4.47645
+     11.4501     8.97719      19.052     50.2684     1.12759  (  6)     chi=4.45283
+     10.7041     9.39507      19.875     50.2797     1.06303  (  7)     chi=3.87555
+     10.5547     9.57611     19.8494     50.2794     1.04777  (  8)     chi=3.85333
+     10.4523     9.66465     19.8671     50.2792      1.0375  (  9)     chi=3.85293
+     10.2472       9.839     19.9086     50.2788      1.0169  ( 10)     chi=3.85281
+     10.0456     10.0302     19.9233     50.2787     0.99684  ( 11)     chi=3.85272
+     10.1467      9.9371     19.9129     50.2788     1.00696  ( 12)     chi=3.8525
+     10.1096     9.97498     19.9115     50.2788     1.00327  ( 13)     chi=3.85247
+     10.0344     10.0483     19.9141     50.2788    0.995791  ( 14)     chi=3.85246
+     10.0209     10.0631     19.9124     50.2788    0.994454  ( 15)     chi=3.85245
+     10.0486      10.035      19.913     50.2788    0.997207  ( 16)     chi=3.85245
+     10.0347      10.049      19.913     50.2788    0.995829  ( 17)     chi=3.85245
+     10.0345     10.0492     19.9129     50.2788    0.995815  ( 18)     chi=3.85245
+     10.0345     10.0492     19.9129     50.2788    0.995814  ( 19)     chi=3.85245
 
 ```
 
 ![demo_signal_fit](demo_signal_fit.png)
 
 The fit result a good description of the signal. 
-The best estimate for the low pass time constant is `10.0432`.
-The best estimates for the high pass time constants are `20.3224` and `9.88288`.
+The best estimate for the low pass time constant is `10.0345`.
+The best estimates for the high pass time constants are `10.0492` and `19.9129`.
 
-Indeed the signal was generated from a step function tha was processed with a low pass filter with time constant `10` and two high pass filterse with time constants `10` and `20`.
+Indeed the signal was generated from a step function tha was processed with a low pass filter with time constant `10` and two high pass filterse with time constants `10` and `20` with the following command:
+
+```bash
+./filtool l10 h10 h20 gen:-50.3,1.0,150.3,0.02 > demo_signal.dat
+```
 
 # Filter inversion
 
 Knowing the filter topology and filter paramters, it is possible to apply matching inverse filters to the signal to reproduce the step function.
 
+This can be done with the command: 
+
+```bash
+./filtool L10.0345 H10.0492 H19.9129 apply < demo_signal.dat > step_reconstruction.dat
+```
+
 ![step_reconstruction](step_reconstruction.png)
 
 The signal is noisier than the input signal because inverting a low pass filter amplifies noise just as the normal low pass filter reduced noise.
 However, the reconstructed step function allows to reshape the pulse shape by applying differnt filters, such as moving average (aka box filter) or delayed differences.
+
+This can be done with the command: 
+
+```bash
+./filtool L10.0345 H10.0492 H19.9129 i10 d10 apply < demo_signal.dat > triangle.dat
+```
 
 ![triangle](triangle.png)
 

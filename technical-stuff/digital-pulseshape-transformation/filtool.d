@@ -19,6 +19,13 @@ void main(string[] args)
 		writeln("   on stdin, the result is written to stdout");
 		writeln(" if <command> is fit:<x0>,<A> the filter paramters are fitted to the signal");
 		writeln("   on stdin, the result is written to stdout as (t y) pairs");
+		writeln(" available filters:");
+		writeln("  h<tau>   high pass with time constant tau");
+		writeln("  l<tau>   low pass with time constant tau");
+		writeln("  H<tau>   inverse high pass with time constant tau");
+		writeln("  L<tau>   inverse low pass with time constant tau");
+		writeln("  i<w>     moving window average with withd w");
+		writeln("  d<d>     delayed difference with delay d");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
 		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10,1.0 < signal.dat > fitresult.dat");
 		writeln(" example: ", args[0], " L9.1 L15.0 H3.0 H4.5 apply < signal.dat > reversed.dat");
