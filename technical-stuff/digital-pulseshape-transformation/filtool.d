@@ -17,18 +17,15 @@ void main(string[] args)
 		writeln("   with timesteps of dt and written to stdout");
 		writeln(" if <command> is apply the filters are applied to the signal");
 		writeln("   on stdin, the result is written to stdout");
-		writeln(" if <command> is fit:<x0> the filter paramters are fitted to the signal");
+		writeln(" if <command> is fit:<x0>,<A> the filter paramters are fitted to the signal");
 		writeln("   on stdin, the result is written to stdout as (t y) pairs");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
-		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10 < signal.dat > fitresult.dat");
+		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10,1.0 < signal.dat > fitresult.dat");
 		writeln(" example: ", args[0], " L9.1 L15.0 H3.0 H4.5 apply < signal.dat > reversed.dat");
 		return;
 	}
 
-
-
 	import std.algorithm, std.array, std.conv;
-
 
 	Filter[] filters;
 	double[] params;
@@ -65,7 +62,8 @@ void main(string[] args)
 			double t1 = gen_params[2];
 			double ns = gen_params[3];
 			import std.random;
-			params ~= 0.0; // append x0
+			params ~= 0.0; // append t0 (pulse start time)
+			params ~= 1.0; // append A (amplitude)
 			for(double t = t0; t < t1+dt/2; t+=dt) writeln(ff(t, params)+uniform(-ns,ns));
 		}
 		if (arg.startsWith("apply")) {
@@ -77,6 +75,7 @@ void main(string[] args)
 			import multifit_nlin;
 			auto fit_params = arg[4..$].split(',').map!(to!double).array;
 			double t0 = fit_params[0];
+			double A  = fit_params[1];
 			Dp!double[] data;
 			double t = 0.0;
 			foreach(l; stdin.byLine) {
@@ -84,6 +83,7 @@ void main(string[] args)
 				t+=1.0;
 			}
 			params ~= t0;
+			params ~= A;
 			auto fitfun = FitFunc(filters);
 			auto fitter = MultifitNlin!(double, typeof(fitfun))(fitfun,data,params,true);
 			fitter.run; 
@@ -105,20 +105,22 @@ struct FitFunc
 		sinc = new SincInterpolation;
 	}
 	double[double] cache;
-	double opCall(double x, double[] params) {
-		assert(params.length == filters.length+1);
-		x+=17;
-		x-=params[$-1];
+	double opCall(double t, double[] params) {
+		assert(params.length == filters.length+2); // 2 additional parameters: t0 and A
+		double t0 = params[$-2];
+		double A  = params[$-1];
+		t+=17;
+		t-=t0;
 
-		if (x<=0) return 0.0;
+		if (t<=0) return 0.0;
 
 		foreach(i, ref filter; filters) filter.reset(params[i]);
 		sinc.reset;
 		// generate a filtered step function and apply sinc interpolation to it
 		sinc.put(filters.apply(0));
 		int n;
-		for(n=0; n+1<x; ++n) sinc.put(filters.apply(1));
-		return sinc.eval(x-n);
+		for(n=0; n+1<t; ++n) sinc.put(filters.apply(1));
+		return A*sinc.eval(t-n);
 	}
 }
 
