@@ -61,6 +61,10 @@ void main(string[] args)
 			filters ~= new InverseHighPass(arg[1..$].to!double);
 			params  ~= arg[1..$].to!double;
 		}
+		if (arg.startsWith("r")) {
+			filters ~= new LinearRegression(arg[1..$].to!double);
+			params  ~= arg[1..$].to!double;
+		}
 		if (arg.startsWith("gen:")) {
 			auto ff = FitFunc(filters);
 			auto gen_params = arg[4..$].split(',').map!(to!double).array;
@@ -254,21 +258,140 @@ class InverseLowPass : Filter {
 	}
 }
 
+// 1*y1 + 2*y2 + 3*y3 + 4*y4
+// 1*y1 + 2*y2 + 3*y3 + 4*y4 + 5*y5 - (y1 + y2 + y3 + y4)
+// 1*y2 + 2*y3 + 3*y4 + 4*y5 
 
-class SincResample : SincInterpolation , Filter {
-	double pos;
-	this(double resample_position) {
-		pos = resample_position;
+class LinearRegression : Filter {
+	double[] buffer;
+	double[] buffer2;
+	int idx = 0;
+	double x_sum  = 0.0;
+	double y_sum  = 0.0;
+	double y2_sum  = 0.0;
+	double xx_sum = 0.0;
+	double xy_sum = 0.0;
+	double xy2_sum = 0.0;
+	int N = 0;
+	this (double w) {
+		N = cast(int)w;
+		buffer = new double[N];
+		buffer[] = 0.0;
+		buffer2 = new double[N];
+		buffer2[] = 0.0;
+		x_sum = 0.0;
+		xx_sum = 0.0;
+		foreach(i;0..N) {
+			x_sum  += i;
+			xx_sum += i*i;
+		}
+		y_sum  = 0.0;
+		y2_sum  = 0.0;
+		xy_sum = 0.0;
+		xy2_sum = 0.0;
 	}
-	override void reset(double) {
-		// nothing
+	override void reset(double w) {
+		N = cast(int)w;
+		buffer.length = N;
+		buffer[] = 0.0;
+		buffer2.length = N;
+		buffer2[] = 0.0;
+		idx = 0;
+		x_sum = 0.0;
+		xx_sum = 0.0;
+		foreach(i;0..N) {
+			x_sum  += i;
+			xx_sum += i*i;
+		}
+		y_sum  = 0.0;
+		y2_sum  = 0.0;
+		xy_sum = 0.0;
+		xy2_sum = 0.0;
 	}
-	override double apply(double x) {
-		put(x);
-		if (empty) return x;
-		return eval(pos);
+	double slope(double[] ys, int idx) {
+		double x_sum  = 0;
+		double y_sum  = 0;
+		double xx_sum = 0;
+		double xy_sum = 0;
+		int N = 0;
+		for(int x = 0; x < ys.length; ++x) {
+			int i = idx+x;
+			if (i>=ys.length) i-=ys.length;
+			double y = ys[i];
+			x_sum += x;
+			y_sum += y;
+			xx_sum += x*x;
+			xy_sum += x*y;
+			++N;
+		}
+		double D = xx_sum*N - x_sum*x_sum;
+		return  (xy_sum*N - x_sum*y_sum) / D;
+		//return xy_sum;
+	}
+//                              y_sum -vvvvvvvvvvvvvvvvv
+// 0*y0 + 1*y1 + 2*y2 + 3*y3[+ 4*y4 - (y0 + y1 + y2 + y3 + y4 - y0) ]
+//        0*y1 + 1*y2 + 2*y3 + 3*y4[+ 4*y5 - (y2 + y3 + y4 + y5) ]
+//               0*y2 + 1*y3 + 2*y4 + 3*y5 
+// => xy_sum += (N-1)*y - y_sum;
+// => y_sum += y-buffer[idx];
+// => buffer[idx] = y; 
+
+
+// [0,0,0,0] y_sum = 0; xy_sum = 0
+// [1,0,0,0] y_sum = 1; xy_sum = 4	
+// [1,2,0,0] y_sum = 3; xy_sum = 4+8	
+// [1,2,3,0] y_sum = 6; xy_sum = 0	
+// [1,2,3,4] y_sum =10; xy_sum = 0	
+// [5,2,3,4] y_sum =14; xy_sum = 0	
+	override double apply(double y) {
+
+		y2_sum  += buffer[idx]-buffer2[idx];
+		xy2_sum += N*buffer[idx] - y2_sum;
+		buffer2[idx] = buffer[idx];
+
+		y_sum  += y-buffer[idx];
+		xy_sum += N*y - y_sum;
+		buffer[idx] = y;
+
+		if (++idx >= N) idx = 0;
+
+		//double slope1 = slope(buffer, idx);
+		//double slope2 = slope(buffer2);
+
+
+
+
+		double D = (xx_sum*N - x_sum*x_sum);
+		double b1 = (xy_sum*N - x_sum*y_sum)/D;
+		double a1 = y_sum/N - b1 * x_sum/N;
+		double b2 = (xy2_sum*N - x_sum*y2_sum)/D;
+		double a2 = y2_sum/N - b2 * x_sum/N;
+
+		double dx1 = -(0*N+(b1*N+a1)/b1);
+		double dx2 = -(0*N+a2/b2);
+		double dx = 0.5*(dx1+dx2);
+		stderr.writeln(-b1*N, " ", b2*N, " ", (y_sum+y2_sum)/N, " ", dx);
+
+		return xy_sum;
 	}
 }
+
+
+
+//class SincResample : SincInterpolation , Filter {
+//	double pos;
+//	this(double resample_position) {
+//		pos = resample_position;
+//	}
+//	override void reset(double) {
+//		// nothing
+//	}
+//	override double apply(double x) {
+//		put(x);
+//		if (empty) return x;
+//		return eval(pos);
+//	}
+//}
 
 
 interface Interpolate {
