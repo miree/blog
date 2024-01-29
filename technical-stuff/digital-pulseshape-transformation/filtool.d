@@ -364,7 +364,7 @@ class LinearRegression : Filter {
 		peak2=peak1;
 		peak1=peak0;
 		peak0=(y1+y2+y3)/3.0;
-		if (peak0 < peak1 && peak1 >= peak2 && (N+(peakt1-t)>=-2.0 && N+(peakt1-t)<=2.0) ) { // local maximum in input N samples ago
+		if (peak0 < peak1 && peak1 >= peak2 && (N+(peakt1-t)>=-N && N+(peakt1-t)<=N) ) { // local maximum in input N samples ago
 			//double tp = t-N+dx_Amax;
 			f.writeln(peakt1-2," 0");
 			f.writeln(peakt1-1," ", peak1, " ", N+(peakt1-t));
