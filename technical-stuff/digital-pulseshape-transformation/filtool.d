@@ -7,7 +7,7 @@ void main(string[] args)
 {
 	if (args.length == 1) {
 		writeln("usage: ", args[0], " {<filter> } <command>");
-		writeln(" <filter> is <type>,<parameters> where");
+		writeln(" <filter> is <type><parameters> where");
 		writeln("   <type> is one of l (lowpass) or h (highpass)");
 		writeln("   <parameters> is a comma separated list of numbers");
 		writeln("     for lowpass and highpass there is only one paramer");
@@ -26,6 +26,8 @@ void main(string[] args)
 		writeln("  L<tau>   inverse low pass with time constant tau");
 		writeln("  i<w>     moving window average with withd w");
 		writeln("  d<d>     delayed difference with delay d");
+		writeln("  r<w>,<n> dual linear regression window width w");
+		writeln("  c<f>,<d> const. fract. discr. with fraction f and delay d");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
 		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10,1.0 < signal.dat > fitresult.dat");
 		writeln(" example: ", args[0], " L9.1 L15.0 H3.0 H4.5 apply < signal.dat > reversed.dat");
@@ -68,17 +70,29 @@ void main(string[] args)
 				                            arg[comma_pos+1..$].to!double);
 			params  ~= arg[1..comma_pos].to!double;
 		}
+		if (arg.startsWith("c")) {
+			long comma_pos = -1;
+			foreach(i,ch;arg) if (ch==',') comma_pos = i;
+			filters ~= new ConstantFraction(cast(int)arg[1..comma_pos].to!double,
+				                            arg[comma_pos+1..$].to!double);
+			params  ~= arg[1..comma_pos].to!double;
+		}
 		if (arg.startsWith("gen:")) {
 			auto ff = FitFunc(filters);
 			auto gen_params = arg[4..$].split(',').map!(to!double).array;
 			double t0 = gen_params[0];
 			double dt = gen_params[1];
 			double t1 = gen_params[2];
-			double ns = gen_params[3];
 			import std.random;
 			params ~= 0.0; // append t0 (pulse start time)
 			params ~= 1.0; // append A (amplitude)
-			for(double t = t0; t < t1+dt/2; t+=dt) writeln(ff(t, params)+uniform(-ns,ns));
+			if (gen_params.length == 4) {
+				double ns = gen_params[3];
+				for(double t = t0; t < t1+dt/2; t+=dt) writeln(ff(t, params)+uniform(-ns,ns));
+			}
+			else {
+				for(double t = t0; t < t1+dt/2; t+=dt) writeln(ff(t, params));
+			}        
 		}
 		if (arg.startsWith("apply")) {
 			foreach(l;stdin.byLine) {
@@ -105,6 +119,17 @@ void main(string[] args)
 			foreach(n; 0..data.length*10) {
 				double tt = 0.1*n;
 				writeln(tt, " ", fitfun(tt,fitter.result_params));
+			}
+
+			auto covar = fitter.result_covar;
+			foreach(i, cov_line; covar) {
+				import std.math;
+				import std.array: appender;
+				import std.format: formattedWrite;
+				auto writer = appender!string;
+				foreach (j, cij; cov_line)
+					writer.formattedWrite("%12s",cij/sqrt(covar[i][i])/sqrt(covar[j][j]));
+				std.stdio.stderr.writeln(writer[]);
 			}
 		}
 	}
@@ -261,10 +286,54 @@ class InverseLowPass : Filter {
 	}
 }
 
+class ConstantFraction : Filter {
+	double[] buffer;
+	int idx = 0;
+	double fraction;
+	double output;
+	double input;
+	File *file;
+	double t;
+	this(int w, double f) {
+		t = 0;
+		buffer = new double[w];
+		buffer[] = 0.0;
+		idx = 0;
+		fraction = f;
+		output = 0;
+		file = new File("pulses.dat","w+");
+	}
+	override void reset(double dummy) {
+		stderr.writeln("ConstantFraction filter cannot be used for fitting");
+		assert(false);
+	}
+	override double apply(double y) {
+		t+=1;
+		double delayed = buffer[idx];
+		buffer[idx] = y;
+		if (++idx >= buffer.length) idx = 0;
+
+		double new_output = -fraction*y+delayed;
+
+		if (new_output >= 0 && output < 0) {
+			double dx = new_output / (new_output - output);
+			double amplitude = input*dx + y*(1-dx);
+			file.writeln(t-2-dx, " ", 0);
+			file.writeln(t-1-dx, " ", amplitude);
+			file.writeln(t-0-dx, " ", 0);
+		}
+
+		output = new_output;
+		input  = y;
+		return new_output;
+	}
+
+}
+
+
 // 1*y1 + 2*y2 + 3*y3 + 4*y4
 // 1*y1 + 2*y2 + 3*y3 + 4*y4 + 5*y5 - (y1 + y2 + y3 + y4)
 // 1*y2 + 2*y3 + 3*y4 + 4*y5 
-
 class LinearRegression : Filter {
 	double[] buffer;
 	double[] buffer2;
