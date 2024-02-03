@@ -20,6 +20,7 @@ void main(string[] args)
 		writeln(" if <command> is fit:<x0>,<A> the filter paramters are fitted to the signal");
 		writeln("   on stdin, the result is written to stdout as (t y) pairs");
 		writeln(" available filters:");
+		writeln("  n<a>     add noise with amplitude a");
 		writeln("  h<tau>   high pass with time constant tau");
 		writeln("  l<tau>   low pass with time constant tau");
 		writeln("  H<tau>   inverse high pass with time constant tau");
@@ -69,6 +70,10 @@ void main(string[] args)
 			filters ~= new HighPass(arg[1..$].to!double);
 			params  ~= arg[1..$].to!double;
 		}
+		if (arg.startsWith("n")) {
+			filters ~= new AddNoise(arg[1..$].to!double);
+			params  ~= arg[1..$].to!double;
+		}
 		if (arg.startsWith("H")) {
 			filters ~= new InverseHighPass(arg[1..$].to!double);
 			params  ~= arg[1..$].to!double;
@@ -103,6 +108,46 @@ void main(string[] args)
 			else {
 				for(double t = t0; t < t1+dt/2; t+=dt) writeln(ff(t, params));
 			}        
+		}
+		if (arg.startsWith("gen2:")) {
+			auto sinc = new SincInterpolation;
+			auto gen_params = arg[5..$].split(',').map!(to!double).array;
+			double t0 = gen_params[0];
+			double t1 = gen_params[1];
+			import std.random;
+			params ~= 0.0; // append t0 (pulse start time)
+			params ~= 1.0; // append A (amplitude)
+			writeln("# ", t0, " ", t1);
+			for(double t = t0; t < t1-0.5; t+=1.0) {
+				if (t < -17) {
+					sinc.put(filters.apply(0));
+					//stderr.writeln(t, " ", 0);
+				} else {
+					sinc.put(filters.apply(1));
+					//stderr.writeln(t, " ", 1);
+				}   
+				auto c =     sinc.get();
+				writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);
+			}
+		}
+		if (arg.startsWith("apply2")) {
+			auto sinc = new SincInterpolation;
+			import std.range;
+			stdin.byLine.take(1).each!writeln;
+			int i = 0;
+			foreach(l;stdin.byLine) {
+				sinc.put(filters.apply(
+					l.split(' ').take(1).front.to!double));
+				if (i++ >= 17) {
+					auto c = sinc.get();
+					writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);
+				}
+			}
+			foreach(j;0..17) {
+					auto c = sinc.get();
+					writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);				
+			}
+			return;
 		}
 		if (arg.startsWith("apply")) {
 			foreach(l;stdin.byLine) {
@@ -153,12 +198,11 @@ struct FitFunc
 		filters = filter_list;
 		sinc = new SincInterpolation;
 	}
-	double[double] cache;
 	double opCall(double t, double[] params) {
 		assert(params.length == filters.length+2); // 2 additional parameters: t0 and A
 		double t0 = params[$-2];
 		double A  = params[$-1];
-		t+=17;
+		t+=17; // compensate for the sinc cutoff range
 		t-=t0;
 
 		if (t<=0) return 0.0;
@@ -325,6 +369,20 @@ class InverseDelayedDifference : Filter {
 	}
 }
 
+class AddNoise : Filter {
+	double amplitude;
+	this (double a) {
+		amplitude = a;
+	}
+	override void reset(double dummy) {
+		stderr.writeln("ConstantFraction filter cannot be used with fit or gen");
+		assert(false);
+	}
+	override double apply(double x) {
+		import std.random;
+		return x + uniform(-amplitude,amplitude);
+	}
+}
 class HighPass : Filter {
 	double tau;
 	this (double TAU) {
@@ -409,7 +467,7 @@ class ConstantFraction : Filter {
 		file = new File("pulses.dat","w+");
 	}
 	override void reset(double dummy) {
-		stderr.writeln("ConstantFraction filter cannot be used for fitting");
+		stderr.writeln("ConstantFraction filter cannot be used with fit or gen");
 		assert(false);
 	}
 	override double apply(double y) {
@@ -500,7 +558,7 @@ class LinearRegression : Filter {
 		xy2_sum = 0.0;
 	}
 	override void reset(double dummy) {
-		stderr.writeln("LinearRegression filter cannot be used for fitting");
+		stderr.writeln("LinearRegression filter cannot be used with fit or gen");
 		assert(false);
 	}
 	override double apply(double y) {
