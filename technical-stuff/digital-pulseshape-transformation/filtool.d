@@ -25,7 +25,9 @@ void main(string[] args)
 		writeln("  H<tau>   inverse high pass with time constant tau");
 		writeln("  L<tau>   inverse low pass with time constant tau");
 		writeln("  i<w>     moving window average with withd w");
+		writeln("  I<w>     inverse moving window average with withd w");
 		writeln("  d<d>     delayed difference with delay d");
+		writeln("  D<d>     inverse delayed difference with delay d");
 		writeln("  r<w>,<n> dual linear regression window width w");
 		writeln("  c<f>,<d> const. fract. discr. with fraction f and delay d");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
@@ -43,8 +45,16 @@ void main(string[] args)
 			filters ~= new DelayedDifference(arg[1..$].to!int);
 			params  ~= arg[1..$].to!double;
 		}
+		if (arg.startsWith("D")) {
+			filters ~= new InverseDelayedDifference(arg[1..$].to!int);
+			params  ~= arg[1..$].to!double;
+		}
 		if (arg.startsWith("i")) {
 			filters ~= new WindowIntegral(arg[1..$].to!int);
+			params  ~= arg[1..$].to!double;
+		}
+		if (arg.startsWith("I")) {
+			filters ~= new InverseWindowIntegral(arg[1..$].to!int);
 			params  ~= arg[1..$].to!double;
 		}
 		if (arg.startsWith("l")) {
@@ -200,6 +210,31 @@ class WindowIntegral : Filter {
 	}
 }
 
+class InverseWindowIntegral : Filter {
+	double[] buffer;
+	int idx = 0;
+	double integral;
+	this (int width) {
+		buffer = new double[width-1];
+		integral = 0;
+	}
+	override void reset(double width) {
+		buffer.length = cast(int)width-1;
+		buffer[] = double.init;
+		integral = 0;
+		idx = 0;
+	}
+	override double apply(double x) {
+		//integral += x;
+		double result = x - integral;
+		integral += result;
+		if (buffer[idx] !is double.init) integral -= buffer[idx];
+		buffer[idx] = result;
+		if (++idx == buffer.length) idx = 0;
+		return result*(buffer.length+1);
+	}
+}
+
 class DelayedDifference : Filter {
 	double[] buffer;
 	int idx = 0;
@@ -215,6 +250,26 @@ class DelayedDifference : Filter {
 		double result = x;
 		if (buffer[idx] !is double.init) result -= buffer[idx];
 		buffer[idx] = x;
+		if (++idx == buffer.length) idx = 0;
+		return result;
+	}
+}
+
+class InverseDelayedDifference : Filter {
+	double[] buffer;
+	int idx = 0;
+	this (int delay) {
+		buffer = new double[delay];
+	}
+	override void reset(double delay) {
+		buffer.length = cast(int)delay;
+		buffer[] = double.init;
+		idx = 0;
+	}
+	override double apply(double x) {
+		double result = x;
+		if (buffer[idx] !is double.init) result += buffer[idx];
+		buffer[idx] = result;
 		if (++idx == buffer.length) idx = 0;
 		return result;
 	}
