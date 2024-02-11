@@ -187,26 +187,49 @@ double apply(Filter[] filter_chain, double y) {
 }
 
 class WindowIntegral : Filter {
-	double[] buffer;
-	int idx = 0;
-	double integral;
-	this (int width) {
-		buffer = new double[width];
-		integral = 0;
+	double[] buffer1;
+	double[] buffer2;
+	double fraction;
+	int idx1 = 0;
+	int idx2 = 0;
+	double integral1;
+	double integral2;
+	this (double width) {
+		int l1 = cast(int)width;
+		int l2 = l1+1;
+		fraction = width-l1;
+		buffer1 = new double[l1];
+		buffer2 = new double[l2];
+		integral1 = 0;
+		integral2 = 0;
 	}
 	override void reset(double width) {
-		buffer.length = cast(int)width;
-		buffer[] = double.init;
-		integral = 0;
-		idx = 0;
+		int l1 = cast(int)width;
+		int l2 = l1+1;
+		fraction = width-l1;
+		buffer1.length = l1;
+		buffer2.length = l2;
+		buffer1[] = double.init;
+		buffer2[] = double.init;
+		integral1 = 0;
+		integral2 = 0;
+		idx1 = 0;
+		idx2 = 0;
 	}
 	override double apply(double x) {
-		integral += x;
-		double result = integral/buffer.length;
-		buffer[idx] = x;
-		if (++idx == buffer.length) idx = 0;
-		if (buffer[idx] !is double.init) integral -= buffer[idx];
-		return result;
+		integral1 += x;
+		double result1 = integral1/buffer1.length;
+		buffer1[idx1] = x;
+		if (++idx1 == buffer1.length) idx1 = 0;
+		if (buffer1[idx1] !is double.init) integral1 -= buffer1[idx1];
+
+		integral2 += x;
+		double result2 = integral2/buffer2.length;
+		buffer2[idx2] = x;
+		if (++idx2 == buffer2.length) idx2 = 0;
+		if (buffer2[idx2] !is double.init) integral2 -= buffer2[idx2];
+
+		return result2*fraction + result1*(1-fraction);
 	}
 }
 
@@ -236,22 +259,41 @@ class InverseWindowIntegral : Filter {
 }
 
 class DelayedDifference : Filter {
-	double[] buffer;
-	int idx = 0;
-	this (int delay) {
-		buffer = new double[delay];
+	double[] buffer1;
+	double[] buffer2;
+	double fraction;
+	int idx1 = 0;
+	int idx2 = 0;
+	this (double delay) {
+		int l1 = cast(int)delay;
+		int l2 = l1+1;
+		fraction = delay-l1;
+		buffer1 = new double[l1];
+		buffer2 = new double[l2];
 	}
 	override void reset(double delay) {
-		buffer.length = cast(int)delay;
-		buffer[] = double.init;
-		idx = 0;
+		int l1 = cast(int)delay;
+		int l2 = l1+1;
+		fraction = delay-l1;
+		buffer1.length = l1;//cast(int)delay;
+		buffer2.length = l2;//cast(int)delay;
+		buffer1[] = double.init;
+		buffer2[] = double.init;
+		idx1 = 0;
+		idx2 = 0;
 	}
 	override double apply(double x) {
-		double result = x;
-		if (buffer[idx] !is double.init) result -= buffer[idx];
-		buffer[idx] = x;
-		if (++idx == buffer.length) idx = 0;
-		return result;
+		double result1 = x;
+		if (buffer1[idx1] !is double.init) result1 -= buffer1[idx1];
+		buffer1[idx1] = x;
+		if (++idx1 == buffer1.length) idx1 = 0;
+
+		double result2 = x;
+		if (buffer2[idx2] !is double.init) result2 -= buffer2[idx2];
+		buffer2[idx2] = x;
+		if (++idx2 == buffer2.length) idx2 = 0;
+
+		return result2*fraction+result1*(1-fraction);
 	}
 }
 
