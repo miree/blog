@@ -196,6 +196,8 @@ class WindowIntegral : Filter {
 	double integral2;
 	this (double width) {
 		int l1 = cast(int)width;
+		if (l1 < 1) l1 = 1;
+		if (l1 > 10000) l1 = 10000;
 		int l2 = l1+1;
 		fraction = width-l1;
 		buffer1 = new double[l1];
@@ -205,6 +207,8 @@ class WindowIntegral : Filter {
 	}
 	override void reset(double width) {
 		int l1 = cast(int)width;
+		if (l1 < 1) l1 = 1;
+		if (l1 > 10000) l1 = 10000;
 		int l2 = l1+1;
 		fraction = width-l1;
 		buffer1.length = l1;
@@ -266,6 +270,8 @@ class DelayedDifference : Filter {
 	int idx2 = 0;
 	this (double delay) {
 		int l1 = cast(int)delay;
+		if (l1 < 1) l1 = 1;
+		if (l1 > 10000) l1 = 10000;
 		int l2 = l1+1;
 		fraction = delay-l1;
 		buffer1 = new double[l1];
@@ -273,6 +279,8 @@ class DelayedDifference : Filter {
 	}
 	override void reset(double delay) {
 		int l1 = cast(int)delay;
+		if (l1 < 1) l1 = 1;
+		if (l1 > 10000) l1 = 10000;
 		int l2 = l1+1;
 		fraction = delay-l1;
 		buffer1.length = l1;//cast(int)delay;
