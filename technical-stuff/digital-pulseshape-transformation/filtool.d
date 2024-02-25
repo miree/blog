@@ -12,11 +12,18 @@ void main(string[] args)
 		writeln("   <parameters> is a comma separated list of numbers");
 		writeln("     for lowpass and highpass there is only one paramer");
 		writeln("   for lowpass and highpass the parameters are time constants");
-		writeln(" if <command> is gen,<t0>,<dt>,<t1>,<noise> the step response");
+		writeln(" if <command> is gen:<t0>,<dt>,<t1>,<noise> the step response");
 		writeln("   of all specified filters is generated between t0 and t1");
-		writeln("   with timesteps of dt and written to stdout");
+		writeln("   with timesteps of dt and additional noise written to stdout");
+		writeln(" if <command> is gen2:<t0>,<t1> the step response");
+		writeln("   of all specified filters is generated between t0 and t1");
+		writeln("   written to stdout. Format is four polynomial coefficients");
+		writeln("   per line: a0 a1 a2 a3");
 		writeln(" if <command> is apply the filters are applied to the signal");
 		writeln("   on stdin, the result is written to stdout");
+		writeln(" if <command> is apply2 the filters are applied to the signal");
+		writeln("   on stdin which is expected in the form of polynomial coefficients.");
+		writeln("   The result is written to stdout");
 		writeln(" if <command> is fit:<x0>,<A> the filter paramters are fitted to the signal");
 		writeln("   on stdin, the result is written to stdout as (t y) pairs");
 		writeln(" available filters:");
@@ -30,6 +37,7 @@ void main(string[] args)
 		writeln("  d<d>     delayed difference with delay d");
 		writeln("  D<d>     inverse delayed difference with delay d");
 		writeln("  r<w>,<n> dual linear regression window width w");
+		writeln("  o<f>,<d> oscillator with freq. f (1.0=sampling freq.) and damping d");
 		writeln("  c<f>,<d> const. fract. discr. with fraction f and delay d");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
 		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10,1.0 < signal.dat > fitresult.dat");
@@ -90,6 +98,13 @@ void main(string[] args)
 			foreach(i,ch;arg) if (ch==',') comma_pos = i;
 			filters ~= new ConstantFraction(cast(int)arg[1..comma_pos].to!double,
 				                            arg[comma_pos+1..$].to!double);
+			params  ~= arg[1..comma_pos].to!double;
+		}
+		if (arg.startsWith("o")) {
+			long comma_pos = -1;
+			foreach(i,ch;arg) if (ch==',') comma_pos = i;
+			filters ~= new Oscillator(arg[1..comma_pos].to!double,
+				                      arg[comma_pos+1..$].to!double);
 			params  ~= arg[1..comma_pos].to!double;
 		}
 		if (arg.startsWith("gen:")) {
@@ -375,7 +390,7 @@ class AddNoise : Filter {
 		amplitude = a;
 	}
 	override void reset(double dummy) {
-		stderr.writeln("ConstantFraction filter cannot be used with fit or gen");
+		stderr.writeln("AddNoise filter cannot be used with fit or gen");
 		assert(false);
 	}
 	override double apply(double x) {
@@ -446,6 +461,26 @@ class InverseLowPass : Filter {
 		double x = dI*tau + integral;
 		integral += dI;
 		return x;
+	}
+}
+class Oscillator : Filter {
+	double frequency;
+	double damping;
+	double dy = 0.0;
+	double y  = 0.0;
+	this (double FREQ, double DAMP) {
+		frequency = FREQ;
+		damping = DAMP;
+	}
+	override void reset(double dummy) {
+		stderr.writeln("Oscillator filter cannot be used with fit or gen");
+		assert(false);
+	}
+	override double apply(double x) {
+		y += dy;
+		dy += (x-y)*frequency;
+		dy -= dy*damping; 
+		return y;
 	}
 }
 
