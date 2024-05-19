@@ -126,23 +126,33 @@ void main(string[] args)
 		}
 		if (arg.startsWith("gen2:")) {
 			auto sinc = new SincInterpolation;
+			auto sinc_out = new SincInterpolation;
 			auto gen_params = arg[5..$].split(',').map!(to!double).array;
 			double t0 = gen_params[0];
-			double t1 = gen_params[1];
-			import std.random;
-			params ~= 0.0; // append t0 (pulse start time)
-			params ~= 1.0; // append A (amplitude)
+			int N = cast(int)gen_params[1];
+			double t1 = t0+N;
+			import std.math;
+			double x = t0-floor(t0);
+			stderr.writeln("x = ", x, " N = ", N);
+			//import std.random;
+			int t00 = cast(int)(t0)-40;
+			if (t00 > -40) t00 = -40;
 			writeln("# ", t0, " ", t1);
-			for(double t = t0; t < t1-0.5; t+=1.0) {
-				if (t < -17) {
+			for(double t = t00; N; t+=1.0) {
+				if (t < -17-16) {
 					sinc.put(filters.apply(0));
-					//stderr.writeln(t, " ", 0);
+					stderr.writeln(t, " ", 0);
 				} else {
 					sinc.put(filters.apply(1));
-					//stderr.writeln(t, " ", 1);
-				}   
-				auto c =     sinc.get();
-				writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);
+					stderr.writeln(t, " ", 1);
+				}
+				sinc_out.put(sinc.eval(x));
+
+				auto c = sinc_out.get();
+				if (t>t0) {
+					writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);
+					--N;
+				}
 			}
 		}
 		if (arg.startsWith("apply2")) {
@@ -150,15 +160,17 @@ void main(string[] args)
 			import std.range;
 			stdin.byLine.take(1).each!writeln;
 			int i = 0;
+			double value;
 			foreach(l;stdin.byLine) {
-				sinc.put(filters.apply(
-					l.split(' ').take(1).front.to!double));
+				value = l.split(' ').front.to!double;
+				sinc.put(filters.apply(value));
 				if (i++ >= 17) {
 					auto c = sinc.get();
 					writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);
 				}
 			}
 			foreach(j;0..17) {
+					sinc.put(filters.apply(value));
 					auto c = sinc.get();
 					writeln(c[0], " ", c[1], " ", c[2], " ", c[3]);				
 			}
