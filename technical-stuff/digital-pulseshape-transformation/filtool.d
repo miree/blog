@@ -574,17 +574,15 @@ class InverseOscillator : Filter {
 		assert(false);
 	}
 	override double apply(double y2) {
+		double x = y2;
 		if (y0 !is y0.init) {
 			double dy1 = y2-y1;
 			double dy0 = y1-y0;
-			double x = (frequency*y1+dy1+(damping-1)*dy0)/frequency;
-			y0 = y1;
-			y1 = y2;
-			return x;
+			x = (frequency*y1+dy1+(damping-1)*dy0)/frequency;
 		}
 		y0 = y1;
 		y1 = y2;
-		return y2;
+		return x;
 	}
 }
 class ConstantFraction : Filter {
