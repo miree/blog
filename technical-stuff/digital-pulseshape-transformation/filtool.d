@@ -44,6 +44,7 @@ void main(string[] args)
 		writeln("  D<d>     inverse delayed difference with delay d");
 		writeln("  r<w>,<n> dual linear regression window width w");
 		writeln("  o<f>,<d> oscillator with freq. f (1.0=sampling freq.) and damping d");
+		writeln("  O<f>,<d> inverse oscillator with freq. f (1.0=sampling freq.) and damping d");
 		writeln("  c<f>,<d> const. fract. discr. with fraction f and delay d");
 		writeln(" example: ", args[0], " l9.1 l15.0 h3.0 h4.5 gen:-10,1.0,100,0.0001 > signal.dat");
 		writeln(" example: ", args[0], " l10 l10 h10 h10 fit:10,1.0 < signal.dat > fitresult.dat");
@@ -110,6 +111,13 @@ void main(string[] args)
 			long comma_pos = -1;
 			foreach(i,ch;arg) if (ch==',') comma_pos = i;
 			filters ~= new Oscillator(arg[1..comma_pos].to!double,
+				                      arg[comma_pos+1..$].to!double);
+			params  ~= arg[1..comma_pos].to!double;
+		}
+		if (arg.startsWith("O")) {
+			long comma_pos = -1;
+			foreach(i,ch;arg) if (ch==',') comma_pos = i;
+			filters ~= new InverseOscillator(arg[1..comma_pos].to!double,
 				                      arg[comma_pos+1..$].to!double);
 			params  ~= arg[1..comma_pos].to!double;
 		}
@@ -534,8 +542,8 @@ class InverseLowPass : Filter {
 class Oscillator : Filter {
 	double frequency;
 	double damping;
-	double dy = 0.0;
-	double y  = 0.0;
+	double dy0 = 0.0;
+	double y0  = 0.0;
 	this (double FREQ, double DAMP) {
 		frequency = FREQ;
 		damping = DAMP;
@@ -545,13 +553,40 @@ class Oscillator : Filter {
 		assert(false);
 	}
 	override double apply(double x) {
-		y += dy;
-		dy += (x-y)*frequency;
-		dy -= dy*damping; 
-		return y;
+		double y1  = y0+dy0;
+		double dy1 = dy0 + (x-y1)*frequency - dy0*damping;
+		dy0 = dy1;
+		y0  = y1;
+		return y1;
 	}
 }
-
+class InverseOscillator : Filter {
+	double frequency;
+	double damping;
+	double y0;
+	double y1;
+	this (double FREQ, double DAMP) {
+		frequency = FREQ;
+		damping = DAMP;
+	}
+	override void reset(double dummy) {
+		stderr.writeln("InverseOscillator filter cannot be used with fit or gen");
+		assert(false);
+	}
+	override double apply(double y2) {
+		if (y0 !is y0.init) {
+			double dy1 = y2-y1;
+			double dy0 = y1-y0;
+			double x = (frequency*y1+dy1+(damping-1)*dy0)/frequency;
+			y0 = y1;
+			y1 = y2;
+			return x;
+		}
+		y0 = y1;
+		y1 = y2;
+		return y2;
+	}
+}
 class ConstantFraction : Filter {
 	double[] buffer;
 	int idx = 0;
