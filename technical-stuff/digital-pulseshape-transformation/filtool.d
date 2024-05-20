@@ -19,6 +19,12 @@ void main(string[] args)
 		writeln("   of all specified filters is generated between t0 and t1");
 		writeln("   written to stdout. Format is four polynomial coefficients");
 		writeln("   per line: a0 a1 a2 a3");
+		writeln("   In this case polynomial approximation to sinc is used for interpolation");
+		writeln(" if <command> is gen3:<t0>,<t1> the step response");
+		writeln("   of all specified filters is generated between t0 and t1");
+		writeln("   written to stdout. Format is five polynomial coefficients");
+		writeln("   per line: a0 a1 a2 a3 a4");
+		writeln("   In this case the true sinc is used for interpolation");
 		writeln(" if <command> is apply the filters are applied to the signal");
 		writeln("   on stdin, the result is written to stdout");
 		writeln(" if <command> is apply2 the filters are applied to the signal");
@@ -155,6 +161,55 @@ void main(string[] args)
 				}
 			}
 		}
+		if (arg.startsWith("gen3:")) {
+			import std.math;
+			auto gen_params = arg[5..$].split(',').map!(to!double).array;
+			double t0 = gen_params[0];
+			int N = cast(int)gen_params[1];
+			int T0 = cast(int)floor(t0);
+			writeln("# ", t0, " ", t0+N);
+			double[] trace;
+			for(int i = 0; i < N+1; ++i) {
+				if (T0+i < 0) {
+					trace ~= filters.apply(0);
+				} else {
+					trace ~= filters.apply(1);
+				}
+			}
+			double sinc_interpolate(double[] ys, double t) {
+				//stderr.writeln("interpolate at ", t);
+				double f_sinc(double x) {
+					import std.math;
+					if (x == 0) return 1;
+					return sin(PI*x)/(PI*x);
+				}
+				double result = 0.0;
+				int N = 500; // exta points (left and reight) beoynd the range of "ys" array
+				int i0 = -N;
+				int i1 = cast(int)ys.length+N;
+				double y = ys[0];
+				for(int i = i0; i < i1; ++i) {
+					if (i>=0 && i< ys.length) y=ys[i];
+					result += y*f_sinc(t-i);
+				}
+				return result;
+			}
+			for (int i = 0; i < N; ++i) {
+				double t = t0+i;
+				double y0 = sinc_interpolate(trace, t-T0+0.0/4.0);
+				double y1 = sinc_interpolate(trace, t-T0+1.0/4.0);
+				double y2 = sinc_interpolate(trace, t-T0+2.0/4.0);
+				double y3 = sinc_interpolate(trace, t-T0+3.0/4.0);
+				double y4 = sinc_interpolate(trace, t-T0+4.0/4.0);
+				double a = y0;
+				double b = (-(3*y4)+16*y3-36*y2+48*y1-25*y0)/3;
+		        double c = -((-(22*y4)+112*y3-228*y2+208*y1-70*y0)/3);
+		        double d = (-(48*y4)+224*y3-384*y2+288*y1-80*y0)/3;
+		        double e = -((-(32*y4)+128*y3-192*y2+128*y1-32*y0)/3);
+				writeln(a, " ", b, " ", c, " ", d, " ", e);
+			}
+		}
+
 		if (arg.startsWith("apply2")) {
 			auto sinc = new SincInterpolation;
 			import std.range;
@@ -178,7 +233,8 @@ void main(string[] args)
 		}
 		if (arg.startsWith("apply")) {
 			foreach(l;stdin.byLine) {
-				writeln(filters.apply(l.to!double));
+				if (l.startsWith('#')) continue;
+				writeln(filters.apply(l.split(' ').front.to!double));
 			}
 		}
 		if (arg.startsWith("fit")) {
@@ -656,7 +712,7 @@ class LinearRegression : Filter {
 		peakt1 = t+dx-N+1;
 
 
-		stderr.writeln(y1, " ", y2, " ", y3, " ", dx);
+		//stderr.writeln(y1, " ", y2, " ", y3, " ", dx);
 
 		//return (y1+y2+y3)/3.0;
 		return (y1+y2)/2.0;
