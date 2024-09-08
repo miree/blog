@@ -155,7 +155,7 @@ main (string[] args)
 	scope(exit) g_object_unref (app);
 	
 
-	g_signal_connect!(GtkApplication*)(app, "activate".toStringz, &activate, cast(gpointer)null);
+	g_signal_connect!(GtkApplication*)(app, "activate", &activate, cast(gpointer)null);
 
 	int argc = cast(int)args.length;
 	char* argv = cast(char*)args[0].ptr;
