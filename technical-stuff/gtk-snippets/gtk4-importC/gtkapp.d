@@ -1,6 +1,52 @@
 import gtk4;
 
 
+struct Tree
+{
+  string fullname;
+  Tree[string] children;
+}
+auto root_node = Tree("root");
+
+Tree* find_node(ref Tree node, string fullname) {
+  Tree* find_helper(ref Tree node, string[] parts) {
+    import std.stdio;
+    //writeln("find_helper ", node.fullname, "   ", parts);
+    if (parts.length == 0) return &node;
+    auto child = parts[0] in node.children;
+    if (child is null) return null;
+    return find_helper(*child, parts[1..$]);
+  }
+  import std.array;
+  auto parts = fullname.split('/');
+  if (parts[0] != node.fullname) return null;
+  return find_helper(node, parts[1..$]);
+}
+
+void print(ref Tree node, int depth = 0) {
+  import std.array, std.algorithm;
+  if (node.children.length == 0) return;
+  foreach(child_name; node.children.byKey.array.sort) {
+    import std.stdio;
+    foreach(i;0..depth) write("   ");
+    writeln(child_name, "    ", node.children[child_name].fullname);
+    print(node.children[child_name], depth+1);
+  }
+}
+
+void add(ref Tree node, string fullname) {
+  void add_helper(ref Tree node, string[] parts) {
+    if (parts.length == 0) return;
+    if ((parts[0] in node.children) is null) 
+      node.children[parts[0]] = Tree(node.fullname~'/'~parts[0]);
+    if (parts.length == 1) return;
+    add_helper(node.children[parts[0]], parts[1..$]);
+  }
+
+  import std.algorithm, std.range;
+  add_helper(node, fullname.split('/'));
+}
+
 
 extern(C) static void
 signal_list_item_factory_setup(GtkSignalListItemFactory* self,
@@ -36,7 +82,8 @@ signal_list_item_factory_bind(GtkSignalListItemFactory* self,
   const char* str = gtk_string_object_get_string(cast(GtkStringObject*)str_obj);
   char[64] buf;
   import core.stdc.stdio;
-  snprintf(buf.ptr,64,"%s -> %d", str, gtk_list_item_get_position(list_item));
+  import std.array, std.conv, std.string;
+  snprintf(buf.ptr,64,"%s   (%s -> %d)", str.to!string.split('/')[$-1].toStringz, str, gtk_list_item_get_position(list_item));
   gtk_label_set_text(label, buf.ptr);
   gtk_tree_expander_set_list_row(cast(GtkTreeExpander*)expander, tree_list_row);
 }
@@ -82,19 +129,17 @@ GListModel* treelist_listmodel_create(void* item,
   import core.stdc.string;
   GtkStringList* string_list = gtk_string_list_new(null); // this implements GListModel
 
-  if (str == "item1") {
-    gtk_string_list_append(string_list, "item1_a");
-    gtk_string_list_append(string_list, "item1_b");
-    gtk_string_list_append(string_list, "item1_c");
-  } else if (str == "item2") {
-    gtk_string_list_append(string_list, "item2_x");
-    gtk_string_list_append(string_list, "item2_y");
-    gtk_string_list_append(string_list, "item2_z");
-  } else if (str == "item1_a") {
-    gtk_string_list_append(string_list, "item1_a_x");
-    gtk_string_list_append(string_list, "item1_a_y");
-    gtk_string_list_append(string_list, "item1_a_z");
+  import std.stdio, std.array, std.algorithm, std.string;
+  auto node = root_node.find_node(str);
+  if (node is null) {
+    writeln("error: found null");
+  } else {
+    foreach(child_name; (*node).children.byKey.array.sort) {
+      gtk_string_list_append(string_list, node.children[child_name].fullname.toStringz);
+    }
+
   }
+
   return cast(GListModel*)string_list;
 }
 
@@ -119,8 +164,12 @@ activate (GtkApplication *app,
 
 
   GtkStringList* string_list = gtk_string_list_new(null); // this implements GListModel
-  gtk_string_list_append(string_list, "item1");
-  gtk_string_list_append(string_list, "item2");
+  import std.array, std.algorithm, std.string;
+  foreach(child_name; root_node.children.byKey.array.sort) {
+    gtk_string_list_append(string_list, root_node.children[child_name].fullname.toStringz);
+  }
+  //gtk_string_list_append(string_list, "item1");
+  //gtk_string_list_append(string_list, "item2");
   gboolean passthrough;
   gboolean autoexpand;
   GtkTreeListModel* treelistmodel = cast(GtkTreeListModel*)gtk_tree_list_model_new(cast(GListModel*)string_list,
@@ -144,9 +193,23 @@ activate (GtkApplication *app,
   gtk_window_present (cast(GtkWindow*)window);
 }
 
+
+
+
 int
 main (string[] args)
 {
+  root_node.add("a/b/c/d");
+  root_node.add("a/b/c/e");
+  root_node.add("a/b/c/f");
+  root_node.add("a/b/c/g");
+  root_node.add("a/b/c/h");
+  root_node.add("a/c");
+  root_node.add("a/d");
+  root_node.add("a/e/f/g/h/i/j");
+  root_node.add("hallo/welt");
+  root_node.add("hallo/world/!");
+  root_node.print();
 
 	GtkApplication *app;
 	int status; 
